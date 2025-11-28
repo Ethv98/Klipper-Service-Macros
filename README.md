@@ -75,6 +75,77 @@ lighting, retraction, and optional behaviors---are stored in:
 
     ServiceSettings.cfg
 
+## 🧩 ServiceSettings.cfg --- Variable Reference Table
+
+  --------------------------------------------------------------------------
+  **Setting**                      **Description**
+  -------------------------------- -----------------------------------------
+  `service_x`                      X-coordinate where the toolhead parks for
+                                   servicing.
+
+  `service_y`                      Y-coordinate where the toolhead parks for
+                                   servicing.
+
+  `z_clearance`                    Z height lifted before XY moves to avoid
+                                   collisions.
+
+  `home_speed`                     Speed used when homing the printer.
+
+  `travel_speed`                   Speed used for XY travel during service
+                                   moves.
+
+  `cooldown_on_start`              Automatically cools down hotend/bed at
+                                   the start of service.
+
+  `restore_temps_on_end`           Restores previously used temperatures
+                                   when service ends.
+
+  `tightening_temp`                Temperature used for tightening a new
+                                   nozzle during a hot swap.
+
+  `retract_before_service`         Retracts filament before servicing if
+                                   enabled.
+
+  `retract_length`                 Amount of filament retraction performed
+                                   before service.
+
+  `extruder_hold`                  Locks extruder motor during service to
+                                   prevent movement.
+
+  `service_leds`                   Enables LED color changes during service
+                                   routines.
+
+  `service_led_color`              LED color used during service (commonly
+                                   bright white).
+
+  `led_restore_delay`              Delay before restoring original LED color
+                                   after service.
+
+  `enable_hot_swap`                Enables guided hot-nozzle replacement
+                                   workflow.
+
+  `enable_cold_swap`               Enables guided cold-nozzle replacement
+                                   workflow.
+
+  `pause_for_steps`                Shows UI prompts that pause and guide
+                                   each step.
+
+  `lock_steppers_during_service`   Keeps steppers locked to prevent drifting
+                                   during service.
+
+  `require_homing`                 Ensures homing is performed before moving
+                                   to service position.
+
+  `safe_approach_x`                Optional safe intermediate X position to
+                                   avoid clips/obstacles.
+
+  `safe_approach_y`                Optional safe intermediate Y position for
+                                   collision-free approach.
+
+  `wait_for_cooldown`              Waits until nozzle cools to a safe
+                                   temperature before service begins.
+  --------------------------------------------------------------------------
+
 ## 📥 Installation
 
 1.  Copy both `.cfg` files into your Klipper configuration folder.\
