@@ -1,12 +1,12 @@
 #!/bin/bash
 #
 # Klipper-Service-Macros Installer / Updater / Uninstaller
-# - Correct Moonraker update_manager schema (2024+)
-# - install_script only (no update_script or uninstall_script)
-# - url: instead of origin:
-# - Safe include normalization
-# - Robust symlink creation
-# - Y/N reboot prompt
+# - Fully updated for latest Moonraker update_manager schema
+# - Cleans old/invalid update_manager entries
+# - Cleans moonraker.asvc service list for service_macros
+# - Symlinks repo Configuration/ to printer_data/config/ServiceMacros
+# - Manages ServiceSettings.cfg with safe merging + include normalization
+# - Interactive reboot prompt (Y/N)
 #
 
 set -euo pipefail
@@ -22,6 +22,7 @@ USER_SETTINGS="$CONFIG_DIR/ServiceSettings.cfg"
 REPO_SETTINGS="$REPO_DIR/Configuration/ServiceSettings.cfg"
 
 MOONRAKER_CONF="$CONFIG_DIR/moonraker.conf"
+MOONRAKER_ASVC="$USER_HOME/printer_data/moonraker.asvc"
 UPDATE_NAME="service_macros"
 
 ###############################################################################
@@ -37,9 +38,11 @@ error() { echo -e "\e[31m[ERROR]\e[0m $1"; exit 1; }
 normalize_includes() {
     if [[ ! -f "$USER_SETTINGS" ]]; then return; fi
 
+    # Remove any existing include lines that reference ServiceMacros to avoid duplicates / bad paths
     sed -i '/\[include .*ServiceMacros\/ServiceMacros.cfg]/d' "$USER_SETTINGS"
     sed -i '/\[include .*\.\/ServiceMacros\/ServiceMacros.cfg]/d' "$USER_SETTINGS"
 
+    # Add a single clean include at the top
     sed -i '1i [include ServiceMacros/ServiceMacros.cfg]' "$USER_SETTINGS"
 
     info "Include normalized in ServiceSettings.cfg"
@@ -50,17 +53,17 @@ normalize_includes() {
 ###############################################################################
 merge_settings() {
     if [[ ! -f "$REPO_SETTINGS" ]]; then
-        error "Template missing at: $REPO_SETTINGS"
+        error "Template settings file not found at: $REPO_SETTINGS"
     fi
 
     if [[ ! -f "$USER_SETTINGS" ]]; then
-        info "Installing default user settings..."
+        info "No existing user settings. Installing defaults..."
         cp "$REPO_SETTINGS" "$USER_SETTINGS"
         normalize_includes
         return
     fi
 
-    info "Merging template defaults into user settings..."
+    info "Merging template defaults into existing user settings..."
 
     TEMP="/tmp/ServiceSettings_merged.cfg"
 
@@ -90,10 +93,10 @@ merge_settings() {
 # SYMLINK CREATION
 ###############################################################################
 create_symlink() {
-    info "Creating ServiceMacros symlink…"
+    info "Ensuring ServiceMacros symlink exists..."
 
     if [[ -e "$MACRO_DIR" || -L "$MACRO_DIR" ]]; then
-        warn "Existing ServiceMacros entry found. Removing…"
+        warn "Existing ServiceMacros entry found at $MACRO_DIR. Removing it..."
         rm -rf "$MACRO_DIR"
     fi
 
@@ -101,20 +104,46 @@ create_symlink() {
 
     ln -s "$REPO_DIR/Configuration" "$MACRO_DIR"
 
-    info "Symlink created: $MACRO_DIR → $REPO_DIR/Configuration"
+    info "Symlink created: $MACRO_DIR -> $REPO_DIR/Configuration"
 }
 
 ###############################################################################
-# UPDATE MANAGER CONFIG (NEW SCHEMA)
+# CLEAN OLD MOONRAKER ENTRIES
 ###############################################################################
-add_update_manager() {
-    info "Configuring Moonraker update_manager entry…"
-
-    if [[ -f "$MOONRAKER_CONF" ]] && grep -q "^\[update_manager $UPDATE_NAME\]" "$MOONRAKER_CONF"; then
-        warn "Entry already exists; skipping."
+clean_old_update_manager_entries() {
+    if [[ ! -f "$MOONRAKER_CONF" ]]; then
         return
     fi
 
+    # Remove ANY old [update_manager service_macros] block (with legacy keys)
+    sed -i "/^\[update_manager $UPDATE_NAME\]/,/^$/d" "$MOONRAKER_CONF" || true
+
+    info "Old update_manager entries for $UPDATE_NAME removed (if any)."
+}
+
+clean_moonraker_asvc() {
+    if [[ ! -f "$MOONRAKER_ASVC" ]]; then
+        return
+    fi
+
+    # Remove any line that is exactly 'service_macros' (with or without surrounding whitespace)
+    sed -i '/^[[:space:]]*service_macros[[:space:]]*$/d' "$MOONRAKER_ASVC" || true
+
+    info "Removed service_macros from moonraker.asvc (if it existed)."
+}
+
+###############################################################################
+# UPDATE MANAGER CONFIG (LATEST SCHEMA)
+###############################################################################
+add_update_manager() {
+    info "Configuring Moonraker update_manager entry..."
+
+    mkdir -p "$(dirname "$MOONRAKER_CONF")"
+
+    # First clean any legacy / duplicate entries
+    clean_old_update_manager_entries
+
+    # Append fresh, schema-compliant block
     cat <<EOF >> "$MOONRAKER_CONF"
 
 [update_manager $UPDATE_NAME]
@@ -123,9 +152,10 @@ path: $REPO_DIR
 url: $REPO_URL
 install_script: service_macros_installer.sh
 backup_strategy: none
+is_system_service: False
 EOF
 
-    info "Moonraker update_manager entry added."
+    info "Moonraker update_manager entry added for $UPDATE_NAME."
 }
 
 ###############################################################################
@@ -136,7 +166,7 @@ prompt_reboot() {
     read -r ans
     case "$ans" in
         [Yy]* )
-            info "Rebooting…"
+            info "Rebooting..."
             sudo reboot
             ;;
         * )
@@ -154,20 +184,21 @@ install_macros() {
     mkdir -p "$CONFIG_DIR"
 
     if [[ -d "$REPO_DIR/.git" ]]; then
-        info "Repo detected; pulling latest…"
+        info "Existing repository detected. Pulling latest changes..."
         git -C "$REPO_DIR" pull
     else
-        info "Cloning repository…"
+        info "Cloning repository into: $REPO_DIR"
         git clone "$REPO_URL" "$REPO_DIR"
     fi
 
     create_symlink
     merge_settings
+    clean_moonraker_asvc
     add_update_manager
 
-    info "Restarting Moonraker / Klipper…"
-    sudo systemctl restart moonraker || warn "Moonraker restart failed."
-    sudo systemctl restart klipper || warn "Klipper restart failed."
+    info "Restarting Moonraker and Klipper..."
+    sudo systemctl restart moonraker || warn "Moonraker restart failed or is not present."
+    sudo systemctl restart klipper || warn "Klipper restart failed or is not present."
 
     info "=== INSTALL COMPLETE ==="
     prompt_reboot
@@ -180,7 +211,7 @@ update_macros() {
     info "=== UPDATE: Klipper-Service-Macros ==="
 
     if [[ ! -d "$REPO_DIR/.git" ]]; then
-        warn "Repo not found; switching to install…"
+        warn "Repository not found. Running fresh install..."
         install_macros
         return
     fi
@@ -189,9 +220,11 @@ update_macros() {
 
     create_symlink
     merge_settings
+    clean_moonraker_asvc
+    add_update_manager
 
-    sudo systemctl restart moonraker || warn "Moonraker restart failed."
-    sudo systemctl restart klipper || warn "Klipper restart failed."
+    sudo systemctl restart moonraker || warn "Moonraker restart failed or is not present."
+    sudo systemctl restart klipper || warn "Klipper restart failed or is not present."
 
     info "=== UPDATE COMPLETE ==="
     prompt_reboot
@@ -203,16 +236,25 @@ update_macros() {
 uninstall_macros() {
     info "=== UNINSTALL: Klipper-Service-Macros ==="
 
-    rm -rf "$MACRO_DIR"
-    rm -rf "$REPO_DIR"
-
-    if [[ -f "$MOONRAKER_CONF" ]]; then
-        sed -i "/^\[update_manager $UPDATE_NAME\]/,/^$/d" "$MOONRAKER_CONF"
-        info "Removed update_manager entry."
+    if [[ -e "$MACRO_DIR" || -L "$MACRO_DIR" ]]; then
+        rm -rf "$MACRO_DIR"
+        info "Removed ServiceMacros from config directory."
     fi
 
-    sudo systemctl restart moonraker || warn "Moonraker restart failed."
-    sudo systemctl restart klipper || warn "Klipper restart failed."
+    if [[ -d "$REPO_DIR" ]]; then
+        rm -rf "$REPO_DIR"
+        info "Removed repo at $REPO_DIR."
+    fi
+
+    if [[ -f "$MOONRAKER_CONF" ]]; then
+        sed -i "/^\[update_manager $UPDATE_NAME\]/,/^$/d" "$MOONRAKER_CONF" || true
+        info "Removed update_manager entry from moonraker.conf."
+    fi
+
+    clean_moonraker_asvc
+
+    sudo systemctl restart moonraker || warn "Moonraker restart failed or is not present."
+    sudo systemctl restart klipper || warn "Klipper restart failed or is not present."
 
     info "=== UNINSTALL COMPLETE ==="
     prompt_reboot
@@ -222,8 +264,8 @@ uninstall_macros() {
 # MAIN
 ###############################################################################
 case "${1:-}" in
-    install) install_macros ;;
-    update) update_macros ;;
+    install)   install_macros ;;
+    update)    update_macros ;;
     uninstall) uninstall_macros ;;
     *)
         echo "Usage: $0 {install|update|uninstall}"
