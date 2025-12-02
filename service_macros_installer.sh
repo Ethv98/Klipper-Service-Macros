@@ -1,7 +1,12 @@
 #!/bin/bash
 #
 # Klipper-Service-Macros Installer / Updater / Uninstaller
-# Adds reboot prompt (Y/N) instead of --reboot flag
+# - Correct Moonraker update_manager schema (2024+)
+# - install_script only (no update_script or uninstall_script)
+# - url: instead of origin:
+# - Safe include normalization
+# - Robust symlink creation
+# - Y/N reboot prompt
 #
 
 set -euo pipefail
@@ -19,10 +24,16 @@ REPO_SETTINGS="$REPO_DIR/Configuration/ServiceSettings.cfg"
 MOONRAKER_CONF="$CONFIG_DIR/moonraker.conf"
 UPDATE_NAME="service_macros"
 
+###############################################################################
+# LOGGING
+###############################################################################
 info() { echo -e "\e[32m[INFO]\e[0m $1"; }
 warn() { echo -e "\e[33m[WARN]\e[0m $1"; }
 error() { echo -e "\e[31m[ERROR]\e[0m $1"; exit 1; }
 
+###############################################################################
+# INCLUDE NORMALIZATION
+###############################################################################
 normalize_includes() {
     if [[ ! -f "$USER_SETTINGS" ]]; then return; fi
 
@@ -30,22 +41,26 @@ normalize_includes() {
     sed -i '/\[include .*\.\/ServiceMacros\/ServiceMacros.cfg]/d' "$USER_SETTINGS"
 
     sed -i '1i [include ServiceMacros/ServiceMacros.cfg]' "$USER_SETTINGS"
-    info "Normalized include line."
+
+    info "Include normalized in ServiceSettings.cfg"
 }
 
+###############################################################################
+# MERGE SETTINGS
+###############################################################################
 merge_settings() {
     if [[ ! -f "$REPO_SETTINGS" ]]; then
-        error "Template settings missing: $REPO_SETTINGS"
+        error "Template missing at: $REPO_SETTINGS"
     fi
 
     if [[ ! -f "$USER_SETTINGS" ]]; then
-        info "Installing default settings..."
+        info "Installing default user settings..."
         cp "$REPO_SETTINGS" "$USER_SETTINGS"
         normalize_includes
         return
     fi
 
-    info "Merging user settings with template..."
+    info "Merging template defaults into user settings..."
 
     TEMP="/tmp/ServiceSettings_merged.cfg"
 
@@ -71,25 +86,32 @@ merge_settings() {
     normalize_includes
 }
 
+###############################################################################
+# SYMLINK CREATION
+###############################################################################
 create_symlink() {
-    info "Creating symlink for ServiceMacros..."
+    info "Creating ServiceMacros symlink…"
 
     if [[ -e "$MACRO_DIR" || -L "$MACRO_DIR" ]]; then
-        warn "Removing old ServiceMacros entry..."
+        warn "Existing ServiceMacros entry found. Removing…"
         rm -rf "$MACRO_DIR"
     fi
 
     mkdir -p "$REPO_DIR/Configuration"
 
     ln -s "$REPO_DIR/Configuration" "$MACRO_DIR"
+
     info "Symlink created: $MACRO_DIR → $REPO_DIR/Configuration"
 }
 
+###############################################################################
+# UPDATE MANAGER CONFIG (NEW SCHEMA)
+###############################################################################
 add_update_manager() {
-    info "Configuring Moonraker update_manager..."
+    info "Configuring Moonraker update_manager entry…"
 
     if [[ -f "$MOONRAKER_CONF" ]] && grep -q "^\[update_manager $UPDATE_NAME\]" "$MOONRAKER_CONF"; then
-        warn "Entry already exists."
+        warn "Entry already exists; skipping."
         return
     fi
 
@@ -98,20 +120,23 @@ add_update_manager() {
 [update_manager $UPDATE_NAME]
 type: git_repo
 path: $REPO_DIR
-origin: $REPO_URL
-install_script: service_macros_installer.sh install
-update_script: service_macros_installer.sh update
+url: $REPO_URL
+install_script: service_macros_installer.sh
+backup_strategy: none
 EOF
 
-    info "Moonraker update entry added."
+    info "Moonraker update_manager entry added."
 }
 
+###############################################################################
+# REBOOT PROMPT
+###############################################################################
 prompt_reboot() {
     echo -ne "\nWould you like to reboot now? (Y/N): "
-    read -r answer
-    case "$answer" in
+    read -r ans
+    case "$ans" in
         [Yy]* )
-            info "Rebooting..."
+            info "Rebooting…"
             sudo reboot
             ;;
         * )
@@ -120,16 +145,19 @@ prompt_reboot() {
     esac
 }
 
+###############################################################################
+# INSTALL
+###############################################################################
 install_macros() {
-    info "=== INSTALLING Klipper-Service-Macros ==="
+    info "=== INSTALL: Klipper-Service-Macros ==="
 
     mkdir -p "$CONFIG_DIR"
 
     if [[ -d "$REPO_DIR/.git" ]]; then
-        info "Updating existing repo..."
+        info "Repo detected; pulling latest…"
         git -C "$REPO_DIR" pull
     else
-        info "Cloning repository..."
+        info "Cloning repository…"
         git clone "$REPO_URL" "$REPO_DIR"
     fi
 
@@ -137,7 +165,7 @@ install_macros() {
     merge_settings
     add_update_manager
 
-    info "Restarting Moonraker & Klipper..."
+    info "Restarting Moonraker / Klipper…"
     sudo systemctl restart moonraker || warn "Moonraker restart failed."
     sudo systemctl restart klipper || warn "Klipper restart failed."
 
@@ -145,16 +173,20 @@ install_macros() {
     prompt_reboot
 }
 
+###############################################################################
+# UPDATE
+###############################################################################
 update_macros() {
-    info "=== UPDATING Klipper-Service-Macros ==="
+    info "=== UPDATE: Klipper-Service-Macros ==="
 
     if [[ ! -d "$REPO_DIR/.git" ]]; then
-        warn "No installation found, switching to install..."
+        warn "Repo not found; switching to install…"
         install_macros
         return
     fi
 
     git -C "$REPO_DIR" pull
+
     create_symlink
     merge_settings
 
@@ -165,8 +197,11 @@ update_macros() {
     prompt_reboot
 }
 
+###############################################################################
+# UNINSTALL
+###############################################################################
 uninstall_macros() {
-    info "=== UNINSTALLING Klipper-Service-Macros ==="
+    info "=== UNINSTALL: Klipper-Service-Macros ==="
 
     rm -rf "$MACRO_DIR"
     rm -rf "$REPO_DIR"
@@ -183,6 +218,9 @@ uninstall_macros() {
     prompt_reboot
 }
 
+###############################################################################
+# MAIN
+###############################################################################
 case "${1:-}" in
     install) install_macros ;;
     update) update_macros ;;
