@@ -133,25 +133,24 @@ clean_moonraker_asvc() {
 }
 
 ###############################################################################
-# UPDATE MANAGER CONFIG (LATEST SCHEMA)
+# UPDATE MANAGER CONFIG
 ###############################################################################
 add_update_manager() {
     info "Configuring Moonraker update_manager entry..."
 
     mkdir -p "$(dirname "$MOONRAKER_CONF")"
 
-    # First clean any legacy / duplicate entries
-    clean_old_update_manager_entries
+    # Remove any old blocks
+    sed -i "/^\[update_manager $UPDATE_NAME\]/,/^$/d" "$MOONRAKER_CONF" || true
 
-    # Append fresh, schema-compliant block
+    # Write Moonraker-compatible block
     cat <<EOF >> "$MOONRAKER_CONF"
 
 [update_manager $UPDATE_NAME]
 type: git_repo
 path: $REPO_DIR
-url: $REPO_URL
+origin: $REPO_URL
 install_script: service_macros_installer.sh
-backup_strategy: none
 is_system_service: False
 EOF
 
