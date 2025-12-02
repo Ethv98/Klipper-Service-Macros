@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Klipper-Service-Macros Installer / Updater / Uninstaller
-# Uses /Configuration directory and installs symlink as "Service Config"
+# Uses /Configuration directory and installs symlink as "Service"
 # Repo: https://github.com/Herculez3D/Klipper-Service-Macros
 #
 
@@ -11,8 +11,8 @@ REPO_URL="https://github.com/Herculez3D/Klipper-Service-Macros.git"
 REPO_DIR="$HOME/Klipper-Service-Macros"
 
 CONFIG_DIR="$HOME/printer_data/config"
-MACRO_DIR="$CONFIG_DIR/Service Config"                       # NEW NAME HERE
-USER_SETTINGS="$CONFIG_DIR/ServiceSettings.cfg"              # editable
+MACRO_DIR="$CONFIG_DIR/Service"                            # NEW FOLDER NAME
+USER_SETTINGS="$CONFIG_DIR/ServiceSettings.cfg"            # editable
 REPO_SETTINGS="$REPO_DIR/Configuration/ServiceSettings.cfg"  # template
 
 MOONRAKER_CONF="$CONFIG_DIR/moonraker.conf"
@@ -56,16 +56,16 @@ merge_settings() {
 
 
 ###############################################################################
-# CREATE SYMLINK: ~/printer_data/config/Service Config → repo /Configuration
+# CREATE SYMLINK: ~/printer_data/config/Service → repo /Configuration
 ###############################################################################
 create_symlink() {
-    echo "Creating symlink for Service Config..."
+    echo "Creating symlink for Service..."
 
     rm -rf "$MACRO_DIR"
     ln -s "$REPO_DIR/Configuration" "$MACRO_DIR"
 
     echo "Symlink created:"
-    echo "\"$MACRO_DIR\" → $REPO_DIR/Configuration"
+    echo "$MACRO_DIR → $REPO_DIR/Configuration"
 }
 
 
