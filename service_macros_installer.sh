@@ -95,11 +95,16 @@ mirror_structure() {
         error "Expected folder not found: $REPO_DIR/Configuration/ServiceMacros"
     fi
 
+    # Safety: fix ownership to current user (so chmod doesn’t silently fail)
+    chown -R "$(whoami)":"$(whoami)" "$MACRO_DIR"
+
     # Make all .cfg files under ServiceMacros read-only
     find "$MACRO_DIR" -type f -name "*.cfg" -exec chmod 444 {} \;
 
-    info "ServiceMacros/*.cfg set to read-only."
+    info "ServiceMacros/*.cfg set to read-only. Current permissions:"
+    ls -l "$MACRO_DIR"
 }
+
 
 ###############################################################################
 # CLEAN OLD MOONRAKER CONFIG ENTRIES
