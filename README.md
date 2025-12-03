@@ -9,6 +9,16 @@ heater management automatically.
 
 --------------------------------------------------------------------------------
 
+# V1.0.0 Release Notes
+
+- this is the first stable release of the macro, installer and formating
+
+- Clunky but functional, treate this as the first prototype
+
+- Establishes fundamentals of funtion and operation
+
+---------------------------------------------------------------------------------
+
 ## ✨ Features
 
 -   **One-click toolhead servicing**
