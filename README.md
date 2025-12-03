@@ -1,3 +1,4 @@
+
 # 📘 **Klipper Service Macros**
 A streamlined toolhead service suite for Klipper—making nozzle changes, diagnostics, and maintenance simple, guided, and safe through the Mainsail/Fluidd interface.
 
@@ -28,9 +29,12 @@ This macro package provides a clean, menu-driven maintenance system with automat
 ### 🛠️ **Service Menu**
 Running `SERVICE_POSITION` places the toolhead in an accessible position and presents a unified maintenance menu:
 
+<img width="428" height="242" alt="Service Menu" src="https://github.com/user-attachments/assets/fddd02d1-776f-4fd0-87d6-7a65678e172e" />
+
 - **Nozzle Change**  
 - **Toolhead Checks**  
 - **Return to Last Position**
+- **Exit**
 
 ---
 
@@ -52,6 +56,9 @@ Includes:
 ### 🧪 **Checks Menu**
 
 A collection of diagnostic tools to verify printer health:
+
+<img width="420" height="243" alt="Checks Menu" src="https://github.com/user-attachments/assets/7d05dd3c-d518-4cda-bb3f-71651dc9d0ea" />
+
 
 #### ✔ **Fan Test**
 - Multi-stage fan ramp (0 → 30% → 60% → 100% → down again)  
@@ -82,15 +89,11 @@ Perfect for detecting:
 - Bearing noise  
 - Frame resonance
 
----
-
 ### ✔ **Heater Test**
 - Heats to 200°C  
 - Stabilizes briefly  
 - Turns off  
 - Lets the user review thermal behavior  
-
----
 
 ### ✔ **Heatbreak Cooling Test**
 - Tests heatsink effectiveness  
@@ -245,17 +248,6 @@ Every macro outputs clear `M118` lines for:
 - Diagnostic outcomes  
 
 This makes it easy to follow along during maintenance.
-
----
-
-# 🧪 **Manual Command**
-
-Start service mode:
-```
-SERVICE_POSITION
-```
-
- or Click the "Service Position" macro now on your Dashboard!
 
 ---
 
